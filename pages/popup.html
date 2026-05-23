@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<title>FocusGuard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f7;
+  --s1:#ffffff;
+  --s2:#f0f0f3;
+  --s3:#e8e8ed;
+  --border:#e0e0e8;
+  --border2:#c8c8d4;
+  --red:#e8003a;
+  --red-d:rgba(232,0,58,0.07);
+  --red-b:rgba(232,0,58,0.18);
+  --green:#0a9e5a;
+  --green-d:rgba(10,158,90,0.1);
+  --amber:#c97000;
+  --amber-d:rgba(201,112,0,0.1);
+  --blue:#1a6fd4;
+  --blue-d:rgba(26,111,212,0.08);
+  --text:#111118;
+  --t2:#555566;
+  --t3:#9999aa;
+  --r:8px;
+  --r2:12px;
+}
+body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;overflow-x:hidden}
+
+/* ─── Tabs ────────────────────────────────────────────────── */
+.tabs{display:flex;background:var(--s1);border-bottom:1px solid var(--border);padding:0 4px}
+.tab{flex:1;padding:10px 4px;text-align:center;font-size:11px;font-weight:500;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:.03em;display:flex;align-items:center;justify-content:center;gap:5px}
+.tab.active{color:var(--text);border-bottom-color:var(--red)}
+.tab:hover:not(.active){color:var(--t2)}
+.tab svg{width:14px;height:14px;flex-shrink:0}
+
+/* ─── Pages ───────────────────────────────────────────────── */
+.page{display:none;padding:14px}
+.page.active{display:block}
+
+/* ─── Header card ─────────────────────────────────────────── */
+.header-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px}
+.logo-wrap{width:36px;height:36px;background:var(--red-d);border:1px solid var(--red-b);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-wrap svg{width:18px;height:18px}
+.header-info{flex:1;min-width:0}
+.header-title{font-size:15px;font-weight:600;letter-spacing:-.02em}
+.header-title span{color:var(--red)}
+.header-sub{font-size:11px;color:var(--t3);margin-top:1px}
+.master-toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.master-toggle input{opacity:0;width:0;height:0;position:absolute}
+.slider-track{position:absolute;inset:0;background:var(--s3);border:1px solid var(--border2);border-radius:12px;cursor:pointer;transition:background .2s}
+.master-toggle input:checked + .slider-track{background:var(--green);border-color:var(--green)}
+.master-toggle.locked input:checked + .slider-track{background:var(--red);border-color:var(--red)}
+.slider-thumb{position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.master-toggle input:checked ~ .slider-thumb{transform:translateX(20px)}
+
+/* ─── Stat row ────────────────────────────────────────────── */
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px}
+.stat-val{font-size:20px;font-weight:600;line-height:1;margin-bottom:3px}
+.stat-val.red{color:var(--red)}
+.stat-val.green{color:var(--green)}
+.stat-val.amber{color:var(--amber)}
+.stat-label{font-size:10px;color:var(--t3);letter-spacing:.04em;text-transform:uppercase}
+
+/* ─── Section ─────────────────────────────────────────────── */
+.section{margin-bottom:10px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.section-title{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);display:flex;align-items:center;gap:5px}
+.section-title svg{width:12px;height:12px;color:var(--t3)}
+
+/* ─── Site list ───────────────────────────────────────────── */
+.site-list{display:flex;flex-direction:column;gap:4px;max-height:148px;overflow-y:auto;margin-bottom:8px}
+.site-list::-webkit-scrollbar{width:3px}
+.site-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.site-item{display:flex;align-items:center;gap:8px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;transition:border-color .12s}
+.site-item:hover{border-color:var(--border2)}
+.site-favicon{width:16px;height:16px;border-radius:3px;object-fit:contain;flex-shrink:0}
+.site-domain{flex:1;font-size:12px;font-family:monospace;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site-count{font-size:10px;font-family:monospace;color:var(--red);background:var(--red-d);padding:1px 6px;border-radius:4px;flex-shrink:0}
+.site-remove{background:none;border:none;color:var(--t3);cursor:pointer;font-size:15px;padding:0 2px;line-height:1;transition:color .12s;flex-shrink:0;display:flex;align-items:center}
+.site-remove:hover{color:var(--red)}
+.site-remove:disabled{opacity:.3;cursor:not-allowed}
+
+/* ─── Add row ─────────────────────────────────────────────── */
+.add-row{display:flex;gap:6px}
+.field{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:monospace;font-size:12px;padding:8px 10px;outline:none;transition:border-color .12s}
+.field::placeholder{color:var(--t3)}
+.field:focus{border-color:var(--red)}
+.btn{font-family:'Inter',sans-serif;font-size:12px;font-weight:500;padding:8px 14px;border:none;border-radius:var(--r);cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0}
+.btn-red{background:var(--red);color:#fff}
+.btn-red:hover{opacity:.85}
+.btn-red:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:var(--s2);color:var(--t2);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-ghost:disabled{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:5px 10px;font-size:11px}
+
+/* ─── Category chips ──────────────────────────────────────── */
+.chip-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.chip{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--s1);color:var(--t2);cursor:pointer;transition:all .12s}
+.chip:hover{border-color:var(--red);color:var(--text)}
+.chip.active{background:var(--red-d);border-color:var(--red-b);color:var(--red)}
+
+/* ─── Lock panel ──────────────────────────────────────────── */
+.lock-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.lock-opt{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;cursor:pointer;transition:all .12s;text-align:center}
+.lock-opt:hover{border-color:var(--border2)}
+.lock-opt.selected{background:var(--red-d);border-color:var(--red-b)}
+.lock-opt-val{font-size:15px;font-weight:600;color:var(--text);line-height:1}
+.lock-opt-label{font-size:10px;color:var(--t3);margin-top:2px;letter-spacing:.04em}
+.lock-opt.selected .lock-opt-val{color:var(--red)}
+.lock-alert{background:var(--red-d);border:1px solid var(--red-b);border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--red);display:none;margin-top:8px;line-height:1.6}
+.lock-alert.show{display:block}
+.lock-countdown{font-size:16px;font-weight:600;font-family:monospace;display:block;margin-bottom:2px}
+
+/* ─── Pomodoro ────────────────────────────────────────────── */
+.pomo-ring-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:12px}
+.pomo-ring{position:relative;width:100px;height:100px}
+.pomo-ring svg{transform:rotate(-90deg)}
+.pomo-ring-bg{stroke:var(--border);stroke-width:6;fill:none}
+.pomo-ring-fill{stroke:var(--red);stroke-width:6;fill:none;stroke-linecap:round;transition:stroke-dashoffset .6s ease,stroke .3s}
+.pomo-ring-fill.break{stroke:var(--green)}
+.pomo-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.pomo-time{font-size:18px;font-weight:600;font-family:monospace;line-height:1}
+.pomo-phase{font-size:9px;color:var(--t3);margin-top:2px;letter-spacing:.08em;text-transform:uppercase}
+.pomo-count{font-size:11px;color:var(--amber);margin-top:6px;letter-spacing:.05em}
+.pomo-controls{display:flex;gap:6px;margin-top:10px}
+.pomo-settings{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.pomo-field-wrap{display:flex;flex-direction:column;gap:3px}
+.pomo-field-label{font-size:10px;color:var(--t3);letter-spacing:.05em}
+
+/* ─── Schedule ────────────────────────────────────────────── */
+.day-row{display:flex;gap:4px;margin-bottom:10px}
+.day-btn{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:6px 2px;text-align:center;font-size:10px;font-weight:500;color:var(--t3);cursor:pointer;transition:all .12s}
+.day-btn.on{background:var(--blue-d);border-color:var(--blue);color:var(--blue)}
+.time-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.time-sep{color:var(--t3);font-size:11px}
+.time-field{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:12px;padding:7px 10px;outline:none;font-family:monospace}
+.time-field:focus{border-color:var(--blue)}
+.schedule-list{display:flex;flex-direction:column;gap:4px}
+.schedule-item{display:flex;align-items:center;justify-content:space-between;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px}
+.schedule-days{font-size:11px;color:var(--blue)}
+.schedule-time{font-size:12px;font-family:monospace;color:var(--text)}
+
+/* ─── Stats page ──────────────────────────────────────────── */
+.bar-chart{margin:4px 0 12px}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.bar-label{font-size:10px;color:var(--t3);width:26px;text-align:right;flex-shrink:0}
+.bar-track{flex:1;background:var(--s2);border-radius:3px;height:16px;overflow:hidden}
+.bar-fill{height:100%;background:var(--red);opacity:.8;border-radius:3px;transition:width .4s ease;min-width:2px;display:flex;align-items:center}
+.bar-val{font-size:9px;font-family:monospace;color:rgba(255,255,255,.7);padding-left:5px;white-space:nowrap}
+.top-sites{display:flex;flex-direction:column;gap:4px}
+.top-site-row{display:flex;align-items:center;justify-content:space-between;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px}
+.top-site-name{font-size:12px;font-family:monospace;color:var(--text)}
+.top-site-n{font-size:11px;color:var(--red);background:var(--red-d);padding:2px 7px;border-radius:4px;font-weight:500}
+
+/* ─── Empty state ─────────────────────────────────────────── */
+.empty{text-align:center;padding:16px 0;color:var(--t3);font-size:12px;font-style:italic}
+
+/* ─── Toggle row ──────────────────────────────────────────── */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;margin-bottom:6px}
+.toggle-row-label{font-size:12px;color:var(--text)}
+.toggle-row-sub{font-size:10px;color:var(--t3)}
+.mini-toggle{position:relative;width:34px;height:18px;flex-shrink:0}
+.mini-toggle input{opacity:0;position:absolute;width:0;height:0}
+.mini-track{position:absolute;inset:0;background:var(--s3);border:1px solid var(--border2);border-radius:9px;cursor:pointer;transition:background .2s}
+.mini-toggle input:checked + .mini-track{background:var(--green);border-color:var(--green)}
+.mini-thumb{position:absolute;width:12px;height:12px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.mini-toggle input:checked ~ .mini-thumb{transform:translateX(16px)}
+
+/* ─── Divider ─────────────────────────────────────────────── */
+.divider{height:1px;background:var(--border);margin:12px 0}
+
+/* ─── Status badge ────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:500}
+.badge-green{background:var(--green-d);color:var(--green)}
+.badge-red{background:var(--red-d);color:var(--red)}
+.badge-amber{background:var(--amber-d);color:var(--amber)}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+</style>
+</head>
+<body>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="block">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>
+    Chặn
+  </div>
+  <div class="tab" data-tab="pomodoro">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+    Pomodoro
+  </div>
+  <div class="tab" data-tab="schedule">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Lịch
+  </div>
+  <div class="tab" data-tab="stats">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Thống kê
+  </div>
+</div>
+
+<!-- ══════════ BLOCK PAGE ══════════ -->
+<div class="page active" id="page-block">
+  <!-- Header -->
+  <div class="header-card">
+    <div class="logo-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f04" stroke-width="2"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>
+    </div>
+    <div class="header-info">
+      <div class="header-title">Focus<span>Guard</span></div>
+      <div class="header-sub" id="globalStatus">Đang bảo vệ bạn</div>
+    </div>
+    <label class="master-toggle" id="masterToggle" title="Bật/Tắt">
+      <input type="checkbox" id="enabledCheck" checked/>
+      <div class="slider-track"></div>
+      <div class="slider-thumb"></div>
+    </label>
+  </div>
+
+  <!-- Stats -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-val red" id="statBlocked">0</div>
+      <div class="stat-label">Hôm nay</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val green" id="statSites">0</div>
+      <div class="stat-label">Trang chặn</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val amber" id="statStreak">0</div>
+      <div class="stat-label">Ngày streak</div>
+    </div>
+  </div>
+
+  <!-- Categories -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
+        Nhóm trang
+      </span>
+    </div>
+    <div class="chip-row" id="categoryChips">
+      <div class="chip" data-cat="social">📱 Mạng xã hội</div>
+      <div class="chip" data-cat="video">🎬 Video</div>
+      <div class="chip" data-cat="news">📰 Tin tức</div>
+      <div class="chip" data-cat="shopping">🛒 Mua sắm</div>
+    </div>
+  </div>
+
+  <!-- Site list -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Danh sách chặn
+      </span>
+      <span class="badge badge-red" id="countBadge">0 trang</span>
+    </div>
+    <div class="site-list" id="siteList"></div>
+    <div class="add-row">
+      <input class="field" id="siteInput" type="text" placeholder="facebook.com"/>
+      <button class="btn btn-red" id="addBtn">+ Thêm</button>
+    </div>
+  </div>
+
+  <!-- Hard Lock -->
+  <div class="divider"></div>
+  <div class="section">
+    <div class="section-head">
+      <span class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        Khóa cứng
+      </span>
+    </div>
+    <div class="lock-grid" id="lockGrid">
+      <div class="lock-opt selected" data-min="15"><div class="lock-opt-val">15</div><div class="lock-opt-label">PHÚT</div></div>
+      <div class="lock-opt" data-min="30"><div class="lock-opt-val">30</div><div class="lock-opt-label">PHÚT</div></div>
+      <div class="lock-opt" data-min="60"><div class="lock-opt-val">1</div><div class="lock-opt-label">GIỜ</div></div>
+      <div class="lock-opt" data-min="120"><div class="lock-opt-val">2</div><div class="lock-opt-label">GIỜ</div></div>
+      <div class="lock-opt" data-min="240"><div class="lock-opt-val">4</div><div class="lock-opt-label">GIỜ</div></div>
+      <div class="lock-opt" data-min="480"><div class="lock-opt-val">8</div><div class="lock-opt-label">GIỜ</div></div>
+    </div>
+    <button class="btn btn-red" id="lockBtn" style="width:100%">🔒 Kích hoạt khóa cứng</button>
+    <div class="lock-alert" id="lockAlert">
+      <span class="lock-countdown" id="lockCountdown">--:--</span>
+      Đang khóa cứng — không thể tắt. Tự mở khóa sau khi hết giờ.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ POMODORO PAGE ══════════ -->
+<div class="page" id="page-pomodoro">
+  <div class="pomo-ring-wrap">
+    <div class="pomo-ring">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <circle class="pomo-ring-bg" cx="50" cy="50" r="44"/>
+        <circle class="pomo-ring-fill" id="pomoRingFill" cx="50" cy="50" r="44"
+          stroke-dasharray="276.46" stroke-dashoffset="0"/>
+      </svg>
+      <div class="pomo-center">
+        <div class="pomo-time" id="pomoTime">25:00</div>
+        <div class="pomo-phase" id="pomoPhase">Sẵn sàng</div>
+      </div>
+    </div>
+    <div class="pomo-count" id="pomoCount">🍅 × 0</div>
+    <div style="margin-top:6px" id="pomoBadge"></div>
+  </div>
+
+  <div class="pomo-settings" id="pomoSettings">
+    <div class="pomo-field-wrap">
+      <label class="pomo-field-label">Làm việc (phút)</label>
+      <input class="field" type="number" id="pomoWork" value="25" min="1" max="90"/>
+    </div>
+    <div class="pomo-field-wrap">
+      <label class="pomo-field-label">Nghỉ (phút)</label>
+      <input class="field" type="number" id="pomoBreak" value="5" min="1" max="30"/>
+    </div>
+  </div>
+
+  <div class="pomo-controls">
+    <button class="btn btn-red" id="pomoStartBtn" style="flex:1">▶ Bắt đầu</button>
+    <button class="btn btn-ghost" id="pomoStopBtn" style="flex:1" disabled>■ Dừng</button>
+  </div>
+
+  <div class="divider"></div>
+  <p style="font-size:11px;color:var(--t3);line-height:1.7">
+    Kỹ thuật Pomodoro: làm việc tập trung trong một khoảng thời gian, sau đó nghỉ ngắn. Trong giờ làm việc, các trang trong danh sách chặn sẽ bị block tự động.
+  </p>
+</div>
+
+<!-- ══════════ SCHEDULE PAGE ══════════ -->
+<div class="page" id="page-schedule">
+  <div class="toggle-row">
+    <div>
+      <div class="toggle-row-label">Lịch tự động</div>
+      <div class="toggle-row-sub">Tự động bật chặn theo khung giờ</div>
+    </div>
+    <label class="mini-toggle">
+      <input type="checkbox" id="scheduleEnabled"/>
+      <div class="mini-track"></div>
+      <div class="mini-thumb"></div>
+    </label>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><span class="section-title">Chọn ngày</span></div>
+    <div class="day-row" id="dayRow">
+      <div class="day-btn" data-day="1">T2</div>
+      <div class="day-btn" data-day="2">T3</div>
+      <div class="day-btn" data-day="3">T4</div>
+      <div class="day-btn" data-day="4">T5</div>
+      <div class="day-btn" data-day="5">T6</div>
+      <div class="day-btn" data-day="6">T7</div>
+      <div class="day-btn" data-day="0">CN</div>
+    </div>
+
+    <div class="section-head"><span class="section-title">Khung giờ</span></div>
+    <div class="time-row">
+      <input class="time-field" type="time" id="timeFrom" value="09:00"/>
+      <span class="time-sep">→</span>
+      <input class="time-field" type="time" id="timeTo" value="17:00"/>
+      <button class="btn btn-red btn-sm" id="addSlotBtn">+ Thêm</button>
+    </div>
+
+    <div class="section-head"><span class="section-title">Lịch đã tạo</span></div>
+    <div class="schedule-list" id="scheduleList">
+      <div class="empty">Chưa có lịch nào</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STATS PAGE ══════════ -->
+<div class="page" id="page-stats">
+  <div class="stat-row" style="margin-bottom:12px">
+    <div class="stat-card">
+      <div class="stat-val red" id="statsToday">0</div>
+      <div class="stat-label">Hôm nay</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val amber" id="statsWeek">0</div>
+      <div class="stat-label">Tuần này</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val green" id="statsTotal">0</div>
+      <div class="stat-label">Tổng cộng</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><span class="section-title">7 ngày gần nhất</span></div>
+    <div class="bar-chart" id="barChart"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><span class="section-title">Top trang bị chặn</span></div>
+    <div class="top-sites" id="topSites">
+      <div class="empty">Chưa có dữ liệu</div>
+    </div>
+  </div>
+
+  <div style="margin-top:10px;text-align:right">
+    <button class="btn btn-ghost btn-sm" id="clearStatsBtn">Xóa thống kê</button>
+  </div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

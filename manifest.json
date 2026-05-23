@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "FocusGuard",
+  "version": "2.0.0",
+  "description": "Chặn website gây mất tập trung. Lên lịch, thống kê, khóa cứng — tất cả trong một.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs",
+    "webNavigation",
+    "notifications"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "pages/popup.html",
+    "default_title": "FocusGuard"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["pages/blocked.html", "pages/blocked.js", "pages/stats.html", "pages/options.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>FocusGuard – Bị chặn</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f4f7;
+  --s1:#ffffff;
+  --border:#e0e0ea;
+  --red:#e8003a;
+  --red-d:rgba(232,0,58,0.07);
+  --red-b:rgba(232,0,58,0.2);
+  --green:#0a9e5a;
+  --text:#111118;
+  --t2:#555566;
+  --t3:#9999aa;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;position:relative;overflow:hidden}
+
+/* Grid lines */
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,0,0,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.04) 1px,transparent 1px);
+  background-size:60px 60px;pointer-events:none}
+
+/* Glow */
+.glow{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);width:500px;height:500px;
+  background:radial-gradient(circle,rgba(232,0,58,.06) 0%,transparent 70%);pointer-events:none}
+
+.wrap{position:relative;z-index:10;max-width:480px;width:100%;text-align:center}
+
+/* Shield */
+.shield{width:72px;height:72px;margin:0 auto 24px;background:var(--red-d);border:1px solid var(--red-b);
+  border-radius:20px;display:flex;align-items:center;justify-content:center;
+  animation:pulse 2.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,0,68,.15)}50%{box-shadow:0 0 0 12px rgba(255,0,68,0)}}
+.shield svg{width:32px;height:32px}
+
+/* Label */
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--red);margin-bottom:12px}
+
+h1{font-size:clamp(28px,6vw,42px);font-weight:700;line-height:1.05;letter-spacing:-.03em;margin-bottom:16px}
+h1 span{color:var(--red)}
+
+/* Site pill */
+.site-pill{display:inline-flex;align-items:center;gap:8px;background:var(--s1);border:1px solid var(--red-b);
+  border-radius:8px;padding:8px 16px;margin-bottom:20px}
+.site-pill img{width:16px;height:16px;border-radius:3px}
+.site-pill span{font-family:monospace;font-size:14px;color:var(--text)}
+
+p{color:var(--t2);font-size:15px;line-height:1.7;max-width:360px;margin:0 auto 28px}
+
+/* Buttons */
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:32px}
+.btn{font-family:'Inter',sans-serif;font-size:13px;font-weight:500;padding:10px 20px;
+  border:none;border-radius:8px;cursor:pointer;transition:all .15s;text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--red);color:#fff}
+.btn-primary:hover{opacity:.85;transform:translateY(-1px)}
+.btn-ghost{background:var(--s1);color:var(--t2);border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2);transform:translateY(-1px)}
+.btn-allow{background:transparent;color:var(--t3);border:1px solid var(--border);font-size:11px;padding:7px 14px}
+.btn-allow:hover{color:var(--t2);border-color:var(--border2)}
+
+/* Allow dropdown */
+.allow-wrap{position:relative;display:inline-block}
+.allow-menu{display:none;position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);
+  background:var(--s1);border:1px solid var(--border);border-radius:8px;overflow:hidden;z-index:100;min-width:160px;
+  box-shadow:0 4px 20px rgba(0,0,0,.12)}
+.allow-menu.open{display:block}
+.allow-item{padding:9px 16px;font-size:12px;cursor:pointer;color:var(--t2);transition:background .1s;white-space:nowrap}
+.allow-item:hover{background:rgba(0,0,0,.04);color:var(--text)}
+
+/* Quote */
+.quote-wrap{border-top:1px solid var(--border);padding-top:20px}
+blockquote{font-size:13px;color:var(--t3);font-style:italic;line-height:1.7;max-width:360px;margin:0 auto}
+cite{display:block;margin-top:8px;font-size:11px;letter-spacing:.08em;color:var(--red);font-style:normal;text-transform:uppercase}
+
+/* Scan line */
+.scan{position:fixed;top:-2px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(232,0,58,.06),transparent);animation:scan 10s linear infinite;pointer-events:none}
+@keyframes scan{to{top:100vh}}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="scan"></div>
+
+<div class="wrap">
+  <div class="shield">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ff0044" stroke-width="2">
+      <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+      <line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/>
+    </svg>
+  </div>
+
+  <div class="eyebrow">FocusGuard đang bảo vệ bạn</div>
+
+  <h1>Trang này<br/>đã bị <span>chặn</span></h1>
+
+  <div class="site-pill">
+    <img id="favicon" src="" alt=""/>
+    <span id="siteName">example.com</span>
+  </div>
+
+  <p>Bạn đã thêm trang này vào danh sách chặn.<br/>
+  Hãy quay lại công việc và giữ vững sự tập trung.</p>
+
+  <div class="btns">
+    <button class="btn btn-primary" id="backBtn">← Quay lại</button>
+    <button class="btn btn-ghost" id="newtabBtn">🏠 Trang mới</button>
+    <div class="allow-wrap">
+      <button class="btn btn-allow" id="allowBtn">⚡ Cho phép tạm thời ▾</button>
+      <div class="allow-menu" id="allowMenu">
+        <div class="allow-item" data-min="5">5 phút</div>
+        <div class="allow-item" data-min="15">15 phút</div>
+        <div class="allow-item" data-min="30">30 phút</div>
+        <div class="allow-item" data-min="60">1 giờ</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="quote-wrap">
+    <blockquote id="quoteText"></blockquote>
+    <cite id="quoteAuthor"></cite>
+  </div>
+</div>
+
+<script src="blocked.js"></script>
+</body>
+</html>
