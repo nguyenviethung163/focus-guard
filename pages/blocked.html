@@ -5,26 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>FocusGuard – Bị chặn</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../lib/theme.css"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#f4f4f7;
-  --s1:#ffffff;
-  --border:#e0e0ea;
-  --red:#e8003a;
-  --red-d:rgba(232,0,58,0.07);
-  --red-b:rgba(232,0,58,0.2);
-  --green:#0a9e5a;
-  --text:#111118;
-  --t2:#555566;
-  --t3:#9999aa;
-}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;transition:background 0.3s, color 0.3s}
 body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;position:relative;overflow:hidden}
 
 /* Grid lines */
 body::before{content:'';position:fixed;inset:0;
-  background-image:linear-gradient(rgba(0,0,0,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.04) 1px,transparent 1px);
+  background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
   background-size:60px 60px;pointer-events:none}
 
 /* Glow */
@@ -129,6 +118,6 @@ cite{display:block;margin-top:8px;font-size:11px;letter-spacing:.08em;color:var(
   </div>
 </div>
 
-<script src="blocked.js"></script>
+<script type="module" src="blocked.js"></script>
 </body>
 </html>

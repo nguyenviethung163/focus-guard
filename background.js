@@ -1,92 +1,184 @@
 // FocusGuard v2 — Background Service Worker
+'use strict';
 
-const DEFAULT_BLOCKED = [
-  "facebook.com","twitter.com","x.com","instagram.com","tiktok.com",
-  "youtube.com","reddit.com","9gag.com","threads.net","snapchat.com",
-  "twitch.tv","pinterest.com","tumblr.com"
-];
+import {
+  DEFAULT_STATE,
+  SYNCED_KEYS,
+  ALIAS_MAP,
+  TICK_ALARM_NAME,
+  FLUSH_ALARM_NAME,
+  CONTEXT_MENU_ID
+} from './lib/constants.js';
 
-const DEFAULT_STATE = {
-  blockedSites: DEFAULT_BLOCKED,
-  isEnabled: true,
-  hardLock: false,
-  hardLockUntil: null,
-  scheduleEnabled: false,
-  scheduleSlots: [],
-  pomodoroActive: false,
-  pomodoroEnd: null,
-  pomodoroWork: 25,
-  pomodoroBreak: 5,
-  pomodoroCount: 0,
-  pomodoroInBreak: false,
-  stats: {},
-  tempAllowList: [],
-  tempAllowExpiry: {},
-  snoozedSites: {},      // { domain: expiryTs | -1 }
-  categories: {
-    social: ["facebook.com","instagram.com","twitter.com","x.com","threads.net","snapchat.com"],
-    video: ["youtube.com","tiktok.com","twitch.tv","vimeo.com"],
-    news: ["reddit.com","9gag.com","buzzfeed.com","dailymail.co.uk"],
-    shopping: ["shopee.vn","lazada.vn","tiki.vn","amazon.com"]
+import {
+  todayKey
+} from './lib/utils.js';
+
+// ── Helpers & State Expiry ────────────────────────────────────────────────────
+
+async function notify(title, message, type) {
+  if (type === 'hardLock') {
+    const d = await chrome.storage.local.get('notifyHardLock');
+    if (d.notifyHardLock === false) return;
   }
-};
+  if (type === 'pomodoro') {
+    const d = await chrome.storage.local.get('notifyPomodoro');
+    if (d.notifyPomodoro === false) return;
+  }
+  chrome.notifications.create({
+    type: "basic",
+    iconUrl: "icons/icon48.png",
+    title,
+    message
+  });
+}
+
+async function expireHardLock(notifyUser = false) {
+  await chrome.storage.local.set({ hardLock: false, hardLockUntil: null });
+  if (notifyUser) {
+    notify("FocusGuard", "Khóa cứng đã hết hạn.", "hardLock");
+  }
+}
+
+async function playPomoSound() {
+  const data = await chrome.storage.local.get('pomoSound');
+  if (data.pomoSound === false) return;
+  
+  try {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT']
+    });
+    
+    if (contexts.length === 0) {
+      await chrome.offscreen.createDocument({
+        url: 'pages/offscreen.html',
+        reasons: ['AUDIO_PLAYBACK'],
+        justification: 'Notification sounds for Pomodoro phase changes'
+      });
+    }
+    
+    chrome.runtime.sendMessage({
+      type: 'PLAY_SOUND',
+      target: 'offscreen'
+    }).catch(() => {
+      // Ignore errors if context is not fully ready or closed
+    });
+  } catch (e) {
+    console.error('Failed to play offscreen sound', e);
+  }
+}
+
+// ── Sync Logic ────────────────────────────────────────────────────────────────
+
+async function initialSync() {
+  try {
+    const syncData = await chrome.storage.sync.get(SYNCED_KEYS);
+    const localData = await chrome.storage.local.get(SYNCED_KEYS);
+    const localUpdates = {};
+    for (const key of SYNCED_KEYS) {
+      if (syncData[key] !== undefined && JSON.stringify(syncData[key]) !== JSON.stringify(localData[key])) {
+        localUpdates[key] = syncData[key];
+      }
+    }
+    if (Object.keys(localUpdates).length > 0) {
+      await chrome.storage.local.set(localUpdates);
+    }
+  } catch (e) {
+    console.error("Sync failed on initialization", e);
+  }
+}
+
+function updateBadge(stats) {
+  const today = todayKey();
+  const todayStats = stats?.[today];
+  const count = todayStats?.blocked || 0;
+  chrome.action.setBadgeText({ text: count > 0 ? String(count) : "" });
+  chrome.action.setBadgeBackgroundColor({ color: '#e8003a' });
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+
 chrome.runtime.onInstalled.addListener(async () => {
   const existing = await chrome.storage.local.get(null);
-  const merged = { ...DEFAULT_STATE };
-  if (existing.blockedSites) merged.blockedSites = existing.blockedSites;
-  if (existing.stats) merged.stats = existing.stats;
-  if (existing.scheduleSlots) merged.scheduleSlots = existing.scheduleSlots;
+  const merged = { ...DEFAULT_STATE, ...existing };
+  
   await chrome.storage.local.set(merged);
-  chrome.alarms.create("tick", { periodInMinutes: 1 });
+  await initialSync();
+  
+  const fresh = await chrome.storage.local.get('stats');
+  updateBadge(fresh.stats);
+
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: CONTEXT_MENU_ID,
+      title: "Chặn trang này với FocusGuard",
+      contexts: ["page"]
+    });
+  });
+
+  chrome.alarms.create(TICK_ALARM_NAME, { periodInMinutes: 1 });
+  chrome.alarms.create(FLUSH_ALARM_NAME, { periodInMinutes: 1 });
 });
 
-// ── Tick ──────────────────────────────────────────────────────────────────────
+chrome.runtime.onStartup.addListener(async () => {
+  chrome.alarms.create(TICK_ALARM_NAME, { periodInMinutes: 1 });
+  chrome.alarms.create(FLUSH_ALARM_NAME, { periodInMinutes: 1 });
+  await initialSync();
+  const fresh = await chrome.storage.local.get('stats');
+  updateBadge(fresh.stats);
+});
+
+// ── Alarms & Tick ─────────────────────────────────────────────────────────────
+
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name !== "tick") return;
+  if (alarm.name === TICK_ALARM_NAME) {
+    const data = await chrome.storage.local.get([
+      "hardLock", "hardLockUntil", "pomodoroActive", "pomodoroEnd",
+      "pomodoroInBreak", "pomodoroWork", "pomodoroBreak", "pomodoroCount",
+      "tempAllowList", "tempAllowExpiry"
+    ]);
+    const updates = {};
 
-  const data = await chrome.storage.local.get([
-    "hardLock","hardLockUntil","pomodoroActive","pomodoroEnd",
-    "pomodoroInBreak","pomodoroWork","pomodoroBreak","pomodoroCount",
-    "tempAllowList","tempAllowExpiry"
-  ]);
-  const updates = {};
-
-  if (data.hardLock && data.hardLockUntil && Date.now() >= data.hardLockUntil) {
-    updates.hardLock = false;
-    updates.hardLockUntil = null;
-    notify("FocusGuard", "Khóa cứng đã hết hạn.");
-  }
-
-  if (data.pomodoroActive && data.pomodoroEnd && Date.now() >= data.pomodoroEnd) {
-    if (!data.pomodoroInBreak) {
-      const breakMs = (data.pomodoroBreak || 5) * 60 * 1000;
-      updates.pomodoroInBreak = true;
-      updates.pomodoroEnd = Date.now() + breakMs;
-      updates.pomodoroCount = (data.pomodoroCount || 0) + 1;
-      updates.isEnabled = false;
-      notify("FocusGuard 🍅", `Hoàn thành #${updates.pomodoroCount}! Nghỉ ${data.pomodoroBreak} phút.`);
-    } else {
-      const workMs = (data.pomodoroWork || 25) * 60 * 1000;
-      updates.pomodoroInBreak = false;
-      updates.pomodoroEnd = Date.now() + workMs;
-      updates.isEnabled = true;
-      notify("FocusGuard 🍅", "Giờ nghỉ kết thúc! Bắt đầu pomodoro mới.");
+    if (data.hardLock && data.hardLockUntil && Date.now() >= data.hardLockUntil) {
+      await expireHardLock(true);
     }
-  }
 
-  const now = Date.now();
-  const expiry = data.tempAllowExpiry || {};
-  const allowed = (data.tempAllowList || []).filter(s => !expiry[s] || expiry[s] > now);
-  if (allowed.length !== (data.tempAllowList || []).length) {
-    updates.tempAllowList = allowed;
-  }
+    if (data.pomodoroActive && data.pomodoroEnd && Date.now() >= data.pomodoroEnd) {
+      if (!data.pomodoroInBreak) {
+        const breakMs = (data.pomodoroBreak || 5) * 60 * 1000;
+        updates.pomodoroInBreak = true;
+        updates.pomodoroEnd = Date.now() + breakMs;
+        updates.pomodoroCount = (data.pomodoroCount || 0) + 1;
+        updates.isEnabled = false;
+        notify("FocusGuard 🍅", `Hoàn thành #${updates.pomodoroCount}! Nghỉ ${data.pomodoroBreak} phút.`, "pomodoro");
+        playPomoSound();
+      } else {
+        const workMs = (data.pomodoroWork || 25) * 60 * 1000;
+        updates.pomodoroInBreak = false;
+        updates.pomodoroEnd = Date.now() + workMs;
+        updates.isEnabled = true;
+        notify("FocusGuard 🍅", "Giờ nghỉ kết thúc! Bắt đầu pomodoro mới.", "pomodoro");
+        playPomoSound();
+      }
+    }
 
-  if (Object.keys(updates).length > 0) await chrome.storage.local.set(updates);
+    const now = Date.now();
+    const expiry = data.tempAllowExpiry || {};
+    const allowed = (data.tempAllowList || []).filter(s => !expiry[s] || expiry[s] > now);
+    if (allowed.length !== (data.tempAllowList || []).length) {
+      updates.tempAllowList = allowed;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await chrome.storage.local.set(updates);
+    }
+  } else if (alarm.name === FLUSH_ALARM_NAME) {
+    await flushActiveTime();
+  }
 });
 
-// ── Schedule check ────────────────────────────────────────────────────────────
+// ── Schedule Check ────────────────────────────────────────────────────────────
+
 function isInSchedule(slots) {
   const now = new Date();
   const day = now.getDay();
@@ -99,31 +191,56 @@ function isInSchedule(slots) {
   });
 }
 
-// ── Normalise any hostname alias to canonical blocked domain ──────────────────
-// Maps known short aliases → canonical form already in the blocklist
-const ALIAS_MAP = {
-  "fb.com": "facebook.com",
-  "fb.me": "facebook.com",
-  "m.facebook.com": "facebook.com",
-  "l.facebook.com": "facebook.com",   // FB link-shim redirect target
-  "lm.facebook.com": "facebook.com",
-  "t.co": "twitter.com",
-  "youtu.be": "youtube.com",
-  "m.youtube.com": "youtube.com",
-  "vm.tiktok.com": "tiktok.com",
-  "m.instagram.com": "instagram.com",
-  "instagr.am": "instagram.com",
-  "redd.it": "reddit.com",
-  "old.reddit.com": "reddit.com",
-  "np.reddit.com": "reddit.com",
-};
+// ── Domain / Matching Logic ────────────────────────────────────────────────────
 
 function resolveHostname(hostname) {
   const clean = hostname.replace(/^www\./, "");
   return ALIAS_MAP[clean] || clean;
 }
 
-// ── Core block logic (shared across all navigation events) ────────────────────
+function matchPattern(urlStr, pattern) {
+  let normPattern = pattern.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
+  let normUrl = urlStr.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
+  
+  if (normPattern.includes('*')) {
+    const combatRegexChars = /[-\/\\^$+?.()|[\]{}]/g;
+    const escaped = normPattern.replace(combatRegexChars, '\\$&');
+    const regexStr = '^' + escaped.replace(/\\\*/g, '.*') + '$';
+    try {
+      const regex = new RegExp(regexStr);
+      try {
+        const urlObj = new URL(urlStr);
+        const host = urlObj.hostname.replace(/^www\./, '');
+        if (regex.test(host)) return true;
+      } catch(e) {}
+      
+      return regex.test(normUrl);
+    } catch(e) {
+      return false;
+    }
+  }
+  
+  try {
+    const urlObj = new URL(urlStr);
+    const host = urlObj.hostname.replace(/^www\./, '');
+    const cleanPatternHost = normPattern.split('/')[0];
+    
+    if (host === cleanPatternHost || host.endsWith('.' + cleanPatternHost)) {
+      const patternPath = normPattern.substring(cleanPatternHost.length);
+      if (patternPath && patternPath !== '/') {
+        const urlPath = normUrl.substring(host.length);
+        return urlPath.startsWith(patternPath);
+      }
+      return true;
+    }
+  } catch(e) {
+    return normUrl.includes(normPattern);
+  }
+  return false;
+}
+
+// ── Blocking Core ─────────────────────────────────────────────────────────────
+
 async function checkAndBlock(details) {
   if (details.frameId !== 0) return;
 
@@ -131,19 +248,21 @@ async function checkAndBlock(details) {
   try { url = new URL(details.url); } catch { return; }
   if (!["http:", "https:"].includes(url.protocol)) return;
 
-  // Skip our own blocked page
+  // Skip our own blocked and interstitial pages
   const blockedPage = chrome.runtime.getURL("pages/blocked.html");
-  if (details.url.startsWith(blockedPage)) return;
+  const interstitialPage = chrome.runtime.getURL("pages/interstitial.html");
+  if (details.url.startsWith(blockedPage) || details.url.startsWith(interstitialPage)) return;
 
   const data = await chrome.storage.local.get([
-    "isEnabled","blockedSites","hardLock","hardLockUntil",
-    "scheduleEnabled","scheduleSlots","tempAllowList",
-    "pomodoroActive","pomodoroInBreak","stats","snoozedSites"
+    "isEnabled", "blockedSites", "hardLock", "hardLockUntil",
+    "scheduleEnabled", "scheduleSlots", "tempAllowList",
+    "pomodoroActive", "pomodoroInBreak", "stats", "snoozedSites",
+    "allowlistMode", "breatheMode"
   ]);
 
   // Expire stale hard lock
   if (data.hardLock && data.hardLockUntil && Date.now() >= data.hardLockUntil) {
-    await chrome.storage.local.set({ hardLock: false, hardLockUntil: null });
+    await expireHardLock(false);
     return;
   }
 
@@ -155,59 +274,67 @@ async function checkAndBlock(details) {
   else if (data.isEnabled) shouldBlock = true;
   if (!shouldBlock) return;
 
-  // Resolve aliases: fb.com → facebook.com, youtu.be → youtube.com, etc.
   const hostname = resolveHostname(url.hostname);
 
-  // Snooze check — site is in blocklist but temporarily paused
-  const snoozed = data.snoozedSites || {};
-  const snoozedEntry = snoozed[hostname];
-  if (snoozedEntry !== undefined) {
-    if (snoozedEntry === -1) return; // indefinite snooze
-    if (Date.now() < snoozedEntry) return; // still within snooze window
-    // Expired — clean up silently
-    const updatedSnooze = { ...snoozed };
-    delete updatedSnooze[hostname];
-    chrome.storage.local.set({ snoozedSites: updatedSnooze });
+  // Snooze check — only in blocklist mode
+  if (!data.hardLock && !data.allowlistMode) {
+    const snoozed = data.snoozedSites || {};
+    const snoozedEntry = snoozed[hostname];
+    if (snoozedEntry !== undefined) {
+      if (snoozedEntry === -1) return; // indefinite snooze
+      if (Date.now() < snoozedEntry) return; // still within snooze window
+      const updatedSnooze = { ...snoozed };
+      delete updatedSnooze[hostname];
+      chrome.storage.local.set({ snoozedSites: updatedSnooze });
+    }
   }
 
   // Temp allow check
   const tempAllow = (data.tempAllowList || []);
-  if (tempAllow.some(s => {
-    const sc = s.replace(/^www\./, "");
-    return hostname === sc || hostname.endsWith("." + sc);
-  })) return;
+  if (tempAllow.some(s => matchPattern(details.url, s))) return;
 
   // Blocked list check
   const blocked = (data.blockedSites || []);
-  const isBlocked = blocked.some(site => {
-    const clean = site.replace(/^www\./, "");
-    return hostname === clean || hostname.endsWith("." + clean);
-  });
-  if (!isBlocked) return;
+  const isMatched = blocked.some(site => matchPattern(details.url, site));
+
+  let blockSite = false;
+  if (data.allowlistMode) {
+    const isExtensionPage = details.url.startsWith("chrome-extension://") || details.url.startsWith("chrome://") || details.url.startsWith("edge://") || details.url.startsWith("about:");
+    const isSpecialHost = hostname === "localhost" || hostname === "127.0.0.1";
+    if (!isMatched && !isExtensionPage && !isSpecialHost) {
+      blockSite = true;
+    }
+  } else {
+    if (isMatched) {
+      blockSite = true;
+    }
+  }
+
+  if (!blockSite) return;
 
   // Record stats
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayKey();
   const stats = data.stats || {};
   if (!stats[today]) stats[today] = { blocked: 0, sites: {} };
   stats[today].blocked += 1;
   stats[today].sites[hostname] = (stats[today].sites[hostname] || 0) + 1;
   await chrome.storage.local.set({ stats });
 
-  const blockedUrl = blockedPage
+  const targetPageName = data.breatheMode ? "interstitial.html" : "blocked.html";
+  const redirectPage = chrome.runtime.getURL(`pages/${targetPageName}`);
+
+  const blockedUrl = redirectPage
     + "?site=" + encodeURIComponent(hostname)
     + "&original=" + encodeURIComponent(details.url);
 
-  chrome.tabs.update(details.tabId, { url: blockedUrl });
+  chrome.tabs.update(details.tabId, { url: blockedUrl }).catch(() => {});
 }
 
-// ── Navigation listeners — cover every path a redirect can take ───────────────
+// ── Navigation Listeners ──────────────────────────────────────────────────────
 
-// 1. User types URL or clicks a link — fires before any network request
 chrome.webNavigation.onBeforeNavigate.addListener(checkAndBlock);
 
-// 2. Server-side redirect (301/302) or meta-refresh — fires after redirect resolves
 chrome.webNavigation.onCommitted.addListener((details) => {
-  // Only act on redirects; normal user-initiated navigations are already caught above
   const redirectTypes = ["server_redirect", "client_redirect"];
   if (redirectTypes.includes(details.transitionType) ||
       (details.transitionQualifiers && details.transitionQualifiers.some(q => q.includes("redirect")))) {
@@ -215,10 +342,10 @@ chrome.webNavigation.onCommitted.addListener((details) => {
   }
 });
 
-// 3. JS-driven navigation (history.pushState / location.replace) — SPA routers
 chrome.webNavigation.onHistoryStateUpdated.addListener(checkAndBlock);
 
 // ── Messages ──────────────────────────────────────────────────────────────────
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "GET_STATE") {
     chrome.storage.local.get(null).then(sendResponse);
@@ -243,11 +370,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.type === "TEMP_ALLOW") {
-    chrome.storage.local.get(["tempAllowList","tempAllowExpiry"]).then(d => {
+    chrome.storage.local.get(["tempAllowList", "tempAllowExpiry"]).then(d => {
       const list = d.tempAllowList || [];
       const expiry = d.tempAllowExpiry || {};
       if (!list.includes(msg.site)) list.push(msg.site);
-      expiry[msg.site] = msg.minutes ? Date.now() + msg.minutes * 60 * 1000 : null;
+      expiry[msg.site] = msg.minutes ? Date.now() + msg.minutes * 60 * 1000 : Infinity;
       chrome.storage.local.set({ tempAllowList: list, tempAllowExpiry: expiry })
         .then(() => sendResponse({ ok: true }));
     });
@@ -255,8 +382,216 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
-function notify(title, message) {
-  chrome.notifications.create({
-    type: "basic", iconUrl: "icons/icon48.png", title, message
-  });
+// ── Time Tracking ─────────────────────────────────────────────────────────────
+
+async function getActiveTabInfo() {
+  const d = await chrome.storage.local.get('activeTabInfo');
+  return d.activeTabInfo || { domain: null, startTime: null, id: null };
 }
+
+async function setActiveTabInfo(info) {
+  await chrome.storage.local.set({ activeTabInfo: info });
+}
+
+async function flushActiveTime() {
+  const info = await getActiveTabInfo();
+  if (!info.domain || !info.startTime) return;
+  const elapsed = Math.floor((Date.now() - info.startTime) / 1000);
+  if (elapsed <= 0) return;
+
+  info.startTime = Date.now();
+  await setActiveTabInfo(info);
+
+  const today = todayKey();
+  const data = await chrome.storage.local.get(['timeSpent', 'timeLimits', 'stats', 'breatheMode']);
+  const timeSpent = data.timeSpent || {};
+  if (!timeSpent[today]) timeSpent[today] = {};
+
+  const currentSpent = (timeSpent[today][info.domain] || 0) + elapsed;
+  timeSpent[today][info.domain] = currentSpent;
+
+  await chrome.storage.local.set({ timeSpent });
+
+  const limits = data.timeLimits || {};
+  const limitMin = limits[info.domain];
+  if (limitMin !== undefined) {
+    const limitSec = limitMin * 60;
+    if (currentSpent >= limitSec) {
+      const pageName = data.breatheMode ? "interstitial.html" : "blocked.html";
+      const blockedPage = chrome.runtime.getURL(`pages/${pageName}`);
+      try {
+        const tab = await chrome.tabs.get(info.id);
+        if (tab && tab.url && !tab.url.startsWith(chrome.runtime.getURL("pages/"))) {
+          const todayStats = data.stats || {};
+          if (!todayStats[today]) todayStats[today] = { blocked: 0, sites: {} };
+          todayStats[today].blocked += 1;
+          todayStats[today].sites[info.domain] = (todayStats[today].sites[info.domain] || 0) + 1;
+
+          await chrome.storage.local.set({ stats: todayStats });
+
+          const blockedUrl = blockedPage
+            + "?site=" + encodeURIComponent(info.domain)
+            + "&original=" + encodeURIComponent(tab.url);
+          chrome.tabs.update(info.id, { url: blockedUrl }).catch(() => {});
+        }
+      } catch (e) {
+        // Tab might have been closed
+      }
+    }
+  }
+}
+
+async function updateActiveTab(tabId) {
+  await flushActiveTime();
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab && tab.url && tab.active) {
+      let url;
+      try { url = new URL(tab.url); } catch { return; }
+      if (["http:", "https:"].includes(url.protocol)) {
+        const domain = resolveHostname(url.hostname);
+        await setActiveTabInfo({
+          id: tabId,
+          domain: domain,
+          startTime: Date.now()
+        });
+      } else {
+        await setActiveTabInfo({ id: null, domain: null, startTime: null });
+      }
+    }
+  } catch (e) {
+    await setActiveTabInfo({ id: null, domain: null, startTime: null });
+  }
+}
+
+chrome.tabs.onActivated.addListener(activeInfo => {
+  updateActiveTab(activeInfo.tabId);
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url) {
+    updateActiveTab(tabId);
+  }
+});
+
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    await flushActiveTime();
+    await setActiveTabInfo({ id: null, domain: null, startTime: null });
+  } else {
+    chrome.tabs.query({ active: true, windowId: windowId }, tabs => {
+      if (tabs && tabs[0]) {
+        updateActiveTab(tabs[0].id);
+      }
+    });
+  }
+});
+
+// ── Storage Synchronization ───────────────────────────────────────────────────
+
+chrome.storage.onChanged.addListener(async (changes, namespace) => {
+  if (namespace === 'local' && changes.stats) {
+    updateBadge(changes.stats.newValue);
+  }
+
+  if (namespace === 'local') {
+    const keysToQuery = [];
+    const changedLocalVals = {};
+    for (const key of SYNCED_KEYS) {
+      if (changes[key]) {
+        keysToQuery.push(key);
+        changedLocalVals[key] = changes[key].newValue;
+      }
+    }
+    if (keysToQuery.length > 0) {
+      try {
+        const syncData = await chrome.storage.sync.get(keysToQuery);
+        const syncUpdates = {};
+        for (const key of keysToQuery) {
+          if (JSON.stringify(syncData[key]) !== JSON.stringify(changedLocalVals[key])) {
+            syncUpdates[key] = changedLocalVals[key];
+          }
+        }
+        if (Object.keys(syncUpdates).length > 0) {
+          await chrome.storage.sync.set(syncUpdates);
+        }
+      } catch (e) {
+        console.error("Local to sync sync failed", e);
+      }
+    }
+  } else if (namespace === 'sync') {
+    const keysToQuery = [];
+    const changedSyncVals = {};
+    for (const key of SYNCED_KEYS) {
+      if (changes[key]) {
+        keysToQuery.push(key);
+        changedSyncVals[key] = changes[key].newValue;
+      }
+    }
+    if (keysToQuery.length > 0) {
+      try {
+        const localData = await chrome.storage.local.get(keysToQuery);
+        const localUpdates = {};
+        for (const key of keysToQuery) {
+          if (JSON.stringify(localData[key]) !== JSON.stringify(changedSyncVals[key])) {
+            localUpdates[key] = changedSyncVals[key];
+          }
+        }
+        if (Object.keys(localUpdates).length > 0) {
+          await chrome.storage.local.set(localUpdates);
+        }
+      } catch (e) {
+        console.error("Sync to local sync failed", e);
+      }
+    }
+  }
+});
+
+// ── Context Menus & Commands ──────────────────────────────────────────────────
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === CONTEXT_MENU_ID && tab && tab.url) {
+    try {
+      const url = new URL(tab.url);
+      if (["http:", "https:"].includes(url.protocol)) {
+        const hostname = resolveHostname(url.hostname);
+        const data = await chrome.storage.local.get(['blockedSites', 'profiles', 'activeProfile']);
+        const blocked = data.blockedSites || [];
+        if (!blocked.includes(hostname)) {
+          blocked.push(hostname);
+          const updates = { blockedSites: blocked };
+          
+          const profiles = data.profiles || {};
+          const active = data.activeProfile || 'Mặc định';
+          if (!profiles[active]) profiles[active] = {};
+          profiles[active].blockedSites = blocked;
+          updates.profiles = profiles;
+
+          await chrome.storage.local.set(updates);
+
+          const blockedPage = chrome.runtime.getURL("pages/blocked.html");
+          const blockedUrl = blockedPage
+            + "?site=" + encodeURIComponent(hostname)
+            + "&original=" + encodeURIComponent(tab.url);
+          chrome.tabs.update(tab.id, { url: blockedUrl }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.error("Context menu block error:", e);
+    }
+  }
+});
+
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === "toggle-enable") {
+    const data = await chrome.storage.local.get(['isEnabled', 'hardLock', 'hardLockUntil', 'pomodoroActive']);
+    const isLocked = data.hardLock && data.hardLockUntil && Date.now() < data.hardLockUntil;
+    if (isLocked || data.pomodoroActive) {
+      notify("FocusGuard", "Không thể tắt khi đang Khóa cứng hoặc chạy Pomodoro.", "system");
+      return;
+    }
+    const nextState = !data.isEnabled;
+    await chrome.storage.local.set({ isEnabled: nextState });
+    notify("FocusGuard", nextState ? "Đã bật bảo vệ." : "Đã tạm dừng bảo vệ.", "system");
+  }
+});

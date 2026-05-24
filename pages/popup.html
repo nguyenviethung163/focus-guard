@@ -5,31 +5,10 @@
 <title>FocusGuard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../lib/theme.css"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#f5f5f7;
-  --s1:#ffffff;
-  --s2:#f0f0f3;
-  --s3:#e8e8ed;
-  --border:#e0e0e8;
-  --border2:#c8c8d4;
-  --red:#e8003a;
-  --red-d:rgba(232,0,58,0.07);
-  --red-b:rgba(232,0,58,0.18);
-  --green:#0a9e5a;
-  --green-d:rgba(10,158,90,0.1);
-  --amber:#c97000;
-  --amber-d:rgba(201,112,0,0.1);
-  --blue:#1a6fd4;
-  --blue-d:rgba(26,111,212,0.08);
-  --text:#111118;
-  --t2:#555566;
-  --t3:#9999aa;
-  --r:8px;
-  --r2:12px;
-}
-body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;overflow-x:hidden}
+body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;overflow-x:hidden;transition:background 0.3s, color 0.3s}
 
 /* ─── Tabs ────────────────────────────────────────────────── */
 .tabs{display:flex;background:var(--s1);border-bottom:1px solid var(--border);padding:0 4px}
@@ -91,6 +70,7 @@ body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans
 .field{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:monospace;font-size:12px;padding:8px 10px;outline:none;transition:border-color .12s}
 .field::placeholder{color:var(--t3)}
 .field:focus{border-color:var(--red)}
+.field.input-error{border-color:var(--red) !important}
 .btn{font-family:'Inter',sans-serif;font-size:12px;font-weight:500;padding:8px 14px;border:none;border-radius:var(--r);cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0}
 .btn-red{background:var(--red);color:#fff}
 .btn-red:hover{opacity:.85}
@@ -214,6 +194,8 @@ body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans
 .import-result{font-size:11px;margin-top:8px;padding:7px 10px;border-radius:6px;display:none}
 .import-result.ok{background:var(--green-d);color:var(--green);display:block}
 .import-result.err{background:var(--red-d);color:var(--red);display:block}
+#openOptionsBtn{background:none;border:none;color:var(--t3);cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center;transition:all .15s;border-radius:6px;flex-shrink:0}
+#openOptionsBtn:hover{color:var(--text);background:var(--s2)}
 </style>
 </head>
 <body>
@@ -248,7 +230,13 @@ body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans
     <div class="header-info">
       <div class="header-title">Focus<span>Guard</span></div>
       <div class="header-sub" id="globalStatus">Đang bảo vệ bạn</div>
+      <select id="profileSelect" style="background:var(--s2); border:1px solid var(--border); border-radius:6px; font-size:10px; padding:2px 4px; font-weight:500; outline:none; color:var(--text); cursor:pointer; margin-top:4px; max-width: 125px;">
+        <!-- Dynamically populated options -->
+      </select>
     </div>
+    <button id="openOptionsBtn" title="Cài đặt">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
     <label class="master-toggle" id="masterToggle" title="Bật/Tắt">
       <input type="checkbox" id="enabledCheck" checked/>
       <div class="slider-track"></div>
@@ -270,6 +258,19 @@ body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans
       <div class="stat-val amber" id="statStreak">0</div>
       <div class="stat-label">Ngày streak</div>
     </div>
+  </div>
+
+  <!-- Allowlist Mode Toggle -->
+  <div class="toggle-row" style="margin-top: 8px; margin-bottom: 8px; padding: 6px 10px;">
+    <div>
+      <div class="toggle-row-label">Chế độ Cho phép (Allowlist)</div>
+      <div class="toggle-row-sub" style="font-size: 10px; color: var(--t3);">Chỉ cho phép truy cập các trang trong danh sách</div>
+    </div>
+    <label class="mini-toggle">
+      <input type="checkbox" id="allowlistModeToggle"/>
+      <div class="mini-track"></div>
+      <div class="mini-thumb"></div>
+    </label>
   </div>
 
   <!-- Categories -->
@@ -305,6 +306,27 @@ body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans
     <div class="add-row">
       <input class="field" id="siteInput" type="text" placeholder="facebook.com"/>
       <button class="btn btn-red" id="addBtn">+ Thêm</button>
+    </div>
+  </div>
+
+  <!-- Daily Time Limits -->
+  <div class="divider"></div>
+  <div class="section">
+    <div class="section-head">
+      <span class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Giới hạn mỗi ngày
+      </span>
+    </div>
+    <div class="site-list" id="limitList" style="max-height: 100px;">
+      <!-- Dynamically rendered time limits -->
+    </div>
+    <div class="add-row">
+      <select class="field" id="limitSiteSelect" style="font-family: inherit; font-size: 11px; max-width: 150px;">
+        <!-- Filled dynamically from blockedSites -->
+      </select>
+      <input class="field" id="limitInput" type="number" placeholder="Phút" style="width: 70px; font-family: inherit;"/>
+      <button class="btn btn-red" id="addLimitBtn">Đặt</button>
     </div>
   </div>
 
@@ -443,12 +465,13 @@ body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans
     </div>
   </div>
 
-  <div style="margin-top:10px;text-align:right">
+  <div style="margin-top:10px;display:flex;justify-content:space-between;gap:8px">
+    <button class="btn btn-ghost btn-sm" id="openStatsBtn" style="color:var(--blue);border-color:var(--blue-b)">📊 Báo cáo chi tiết</button>
     <button class="btn btn-ghost btn-sm" id="clearStatsBtn">Xóa thống kê</button>
   </div>
 </div>
 
-<script src="popup.js"></script>
+<script type="module" src="popup.js"></script>
 
 <!-- Import modal -->
 <div class="modal-backdrop" id="importModal">

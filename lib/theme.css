@@ -1,0 +1,91 @@
+/* FocusGuard v2 — Centralized Theme Stylesheet */
+
+:root {
+  --bg: #f5f5f7;
+  --s1: #ffffff;
+  --s2: #f0f0f3;
+  --s3: #e8e8ed;
+  --border: #e0e0e8;
+  --border2: #c8c8d4;
+  --red: #e8003a;
+  --red-d: rgba(232, 0, 58, 0.07);
+  --red-b: rgba(232, 0, 58, 0.18);
+  --green: #0a9e5a;
+  --green-d: rgba(10, 158, 90, 0.1);
+  --amber: #c97000;
+  --amber-d: rgba(201, 112, 0, 0.1);
+  --blue: #1a6fd4;
+  --blue-d: rgba(26, 111, 212, 0.08);
+  --blue-b: rgba(26, 111, 212, 0.18);
+  --text: #111118;
+  --t2: #555566;
+  --t3: #9999aa;
+  --r: 8px;
+  --r2: 12px;
+  --shadow: 0 4px 20px rgba(0,0,0,0.04);
+  --grid-line: rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121214;
+    --s1: #1a1a1e;
+    --s2: #24242b;
+    --s3: #2d2d35;
+    --border: #2d2d35;
+    --border2: #40404c;
+    --text: #f5f5f7;
+    --t2: #a0a0b0;
+    --t3: #707080;
+    --red-d: rgba(232, 0, 58, 0.15);
+    --red-b: rgba(232, 0, 58, 0.3);
+    --blue-d: rgba(26, 111, 212, 0.15);
+    --blue-b: rgba(26, 111, 212, 0.3);
+    --green-d: rgba(10, 158, 90, 0.15);
+    --shadow: 0 4px 20px rgba(0,0,0,0.2);
+    --grid-line: rgba(255, 255, 255, 0.015);
+  }
+}
+
+[data-theme="dark"] {
+  --bg: #121214;
+  --s1: #1a1a1e;
+  --s2: #24242b;
+  --s3: #2d2d35;
+  --border: #2d2d35;
+  --border2: #40404c;
+  --text: #f5f5f7;
+  --t2: #a0a0b0;
+  --t3: #707080;
+  --red-d: rgba(232, 0, 58, 0.15);
+  --red-b: rgba(232, 0, 58, 0.3);
+  --blue-d: rgba(26, 111, 212, 0.15);
+  --blue-b: rgba(26, 111, 212, 0.3);
+  --green-d: rgba(10, 158, 90, 0.15);
+  --shadow: 0 4px 20px rgba(0,0,0,0.2);
+  --grid-line: rgba(255, 255, 255, 0.015);
+}
+
+[data-theme="light"] {
+  --bg: #f5f5f7;
+  --s1: #ffffff;
+  --s2: #f0f0f3;
+  --s3: #e8e8ed;
+  --border: #e0e0e8;
+  --border2: #c8c8d4;
+  --red: #e8003a;
+  --red-d: rgba(232, 0, 58, 0.07);
+  --red-b: rgba(232, 0, 58, 0.18);
+  --green: #0a9e5a;
+  --green-d: rgba(10, 158, 90, 0.1);
+  --amber: #c97000;
+  --amber-d: rgba(201, 112, 0, 0.1);
+  --blue: #1a6fd4;
+  --blue-d: rgba(26, 111, 212, 0.08);
+  --blue-b: rgba(26, 111, 212, 0.18);
+  --text: #111118;
+  --t2: #555566;
+  --t3: #9999aa;
+  --shadow: 0 4px 20px rgba(0,0,0,0.04);
+  --grid-line: rgba(0, 0, 0, 0.04);
+}

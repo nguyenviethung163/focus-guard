@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FocusGuard – Hít thở sâu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../lib/theme.css"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --r: 12px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  overflow: hidden;
+  transition: background 0.3s, color 0.3s;
+}
+
+.container {
+  text-align: center;
+  max-width: 480px;
+  width: 100%;
+}
+
+.logo-wrap {
+  width: 48px;
+  height: 48px;
+  background: var(--red-d);
+  border: 1px solid var(--red-b);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+}
+.logo-wrap svg {
+  width: 24px;
+  height: 24px;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+
+.desc {
+  color: var(--t2);
+  font-size: 14px;
+  margin-bottom: 40px;
+  line-height: 1.6;
+}
+
+/* Breathing animation area */
+.breathe-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.breathe-circle {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  background: rgba(10, 158, 90, 0.15);
+  border-radius: 50%;
+  animation: breathe 5s infinite ease-in-out;
+  transition: background 0.3s;
+}
+
+.breathe-circle-inner {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  background: var(--green);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 22px;
+  font-family: monospace;
+  box-shadow: 0 4px 16px rgba(10, 158, 90, 0.3);
+  z-index: 2;
+}
+
+.breathe-instruction {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+  margin-top: 15px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  height: 20px;
+}
+
+/* Controls */
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.btn {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 24px;
+  border: none;
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.btn-red {
+  background: var(--red);
+  color: #fff;
+}
+.btn-red:hover {
+  opacity: 0.9;
+}
+.btn-green {
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(10,158,90,0.2);
+}
+.btn-green:hover:not(:disabled) {
+  opacity: 0.95;
+}
+.btn-green:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn-ghost {
+  background: var(--s1);
+  color: var(--t2);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover {
+  color: var(--text);
+  border-color: var(--t3);
+}
+
+@keyframes breathe {
+  0% {
+    transform: scale(1);
+    background: rgba(10, 158, 90, 0.15);
+  }
+  50% {
+    transform: scale(1.6);
+    background: rgba(10, 158, 90, 0.3);
+  }
+  100% {
+    transform: scale(1);
+    background: rgba(10, 158, 90, 0.15);
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="logo-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#e8003a" stroke-width="2">
+      <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+      <line x1="8" y1="8" x2="16" y2="16"/>
+      <line x1="16" y1="8" x2="8" y2="16"/>
+    </svg>
+  </div>
+  
+  <h1>Breathe – Hãy hít thở sâu</h1>
+  <p class="desc">Bạn đang cố gắng truy cập một trang bị chặn. Hãy dành 10 giây hít thở sâu và lấy lại sự tập trung trước khi quyết định.</p>
+
+  <div class="breathe-container">
+    <div class="breathe-circle"></div>
+    <div class="breathe-circle-inner" id="countdown">10</div>
+  </div>
+  
+  <p class="breathe-instruction" id="instruction">Hít vào...</p>
+
+  <div class="actions" style="margin-top: 40px;">
+    <button class="btn btn-ghost" id="backBtn">Quay lại ngay</button>
+    <button class="btn btn-green" id="proceedBtn" disabled>Tiếp tục truy cập (5p)</button>
+  </div>
+</div>
+
+<script type="module" src="interstitial.js"></script>
+</body>
+</html>

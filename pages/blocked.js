@@ -1,36 +1,61 @@
+// FocusGuard v2 — Blocked Page Controller
 'use strict';
+
+import { $, applyTheme } from '../lib/utils.js';
+import { QUOTES } from '../lib/constants.js';
+import { getState } from '../lib/storage.js';
 
 const params = new URLSearchParams(location.search);
 const site = params.get('site') || 'unknown';
 const original = params.get('original') || '';
 
-document.getElementById('siteName').textContent = site;
-document.getElementById('favicon').src =
-  'https://www.google.com/s2/favicons?domain=' + site + '&sz=16';
+$('siteName').textContent = site;
+$('favicon').src = 'https://www.google.com/s2/favicons?domain=' + site + '&sz=16';
 document.title = 'Bị chặn: ' + site;
 
+// Load state, apply theme and quotes
+(async () => {
+  const S = await getState();
+  applyTheme(S.theme);
+
+  const custom = S.customQuotes || [];
+  
+  // Adapt constants quotes to match format of custom quotes { text, author }
+  const defaultQuotes = QUOTES.map(q => {
+    // If quote is already an object, use it. Otherwise adapt string to object format.
+    if (typeof q === 'object' && q.text) return q;
+    return { text: q, author: 'Khuyết danh' };
+  });
+
+  const allQuotes = [...defaultQuotes, ...custom];
+  const q = allQuotes[Math.floor(Math.random() * allQuotes.length)];
+  $('quoteText').textContent = '"' + q.text + '"';
+  $('quoteAuthor').textContent = q.author ? '— ' + q.author : '— Khuyết danh';
+})();
+
 // Buttons
-document.getElementById('backBtn').addEventListener('click', () => history.back());
-document.getElementById('newtabBtn').addEventListener('click', () => {
-  chrome.tabs.update({ url: 'chrome://newtab' });
+$('backBtn').addEventListener('click', () => {
+  if (window.history.length > 1) {
+    history.back();
+  } else {
+    chrome.tabs.getCurrent(tab => {
+      if (tab) chrome.tabs.remove(tab.id);
+      else window.close();
+    });
+  }
 });
 
-// Quotes
-const quotes = [
-  { text: 'Sự tập trung không phải là từ chối điều xấu — mà là nói có với điều quan trọng nhất.', author: 'Steve Jobs' },
-  { text: 'Người chiến thắng không làm nhiều hơn, họ tập trung hơn.', author: 'Gary Keller' },
-  { text: 'Mỗi lần bạn cưỡng lại sự phân tâm, bạn đang luyện tập ý chí.', author: 'Khuyết danh' },
-  { text: 'Những gì bạn chú ý đến sẽ trở thành cuộc sống của bạn.', author: 'Winifred Gallagher' },
-  { text: 'Làm sâu hơn, không phải bận rộn hơn.', author: 'Cal Newport' },
-  { text: 'Internet không phải kẻ thù. Sự mất tập trung mới là.', author: 'Khuyết danh' },
-];
-const q = quotes[Math.floor(Math.random() * quotes.length)];
-document.getElementById('quoteText').textContent = '"' + q.text + '"';
-document.getElementById('quoteAuthor').textContent = '— ' + q.author;
+$('newtabBtn').addEventListener('click', () => {
+  chrome.tabs.create({ url: 'chrome://newtab/' }, () => {
+    chrome.tabs.getCurrent(tab => {
+      if (tab) chrome.tabs.remove(tab.id);
+    });
+  });
+});
 
 // Allow dropdown
-const allowBtn = document.getElementById('allowBtn');
-const allowMenu = document.getElementById('allowMenu');
+const allowBtn = $('allowBtn');
+const allowMenu = $('allowMenu');
 
 allowBtn.addEventListener('click', e => {
   e.stopPropagation();
