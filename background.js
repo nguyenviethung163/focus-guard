@@ -22,6 +22,7 @@ const DEFAULT_STATE = {
   stats: {},
   tempAllowList: [],
   tempAllowExpiry: {},
+  snoozedSites: {},      // { domain: expiryTs | -1 }
   categories: {
     social: ["facebook.com","instagram.com","twitter.com","x.com","threads.net","snapchat.com"],
     video: ["youtube.com","tiktok.com","twitch.tv","vimeo.com"],
@@ -137,7 +138,7 @@ async function checkAndBlock(details) {
   const data = await chrome.storage.local.get([
     "isEnabled","blockedSites","hardLock","hardLockUntil",
     "scheduleEnabled","scheduleSlots","tempAllowList",
-    "pomodoroActive","pomodoroInBreak","stats"
+    "pomodoroActive","pomodoroInBreak","stats","snoozedSites"
   ]);
 
   // Expire stale hard lock
@@ -156,6 +157,18 @@ async function checkAndBlock(details) {
 
   // Resolve aliases: fb.com → facebook.com, youtu.be → youtube.com, etc.
   const hostname = resolveHostname(url.hostname);
+
+  // Snooze check — site is in blocklist but temporarily paused
+  const snoozed = data.snoozedSites || {};
+  const snoozedEntry = snoozed[hostname];
+  if (snoozedEntry !== undefined) {
+    if (snoozedEntry === -1) return; // indefinite snooze
+    if (Date.now() < snoozedEntry) return; // still within snooze window
+    // Expired — clean up silently
+    const updatedSnooze = { ...snoozed };
+    delete updatedSnooze[hostname];
+    chrome.storage.local.set({ snoozedSites: updatedSnooze });
+  }
 
   // Temp allow check
   const tempAllow = (data.tempAllowList || []);

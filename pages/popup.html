@@ -182,6 +182,38 @@ body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans
 .badge-red{background:var(--red-d);color:var(--red)}
 .badge-amber{background:var(--amber-d);color:var(--amber)}
 .badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* ─── Snooze badge on site items ─────────────────────────── */
+.snooze-badge{font-size:10px;font-family:monospace;color:var(--amber);background:var(--amber-d);border:1px solid rgba(201,112,0,.2);padding:1px 6px;border-radius:4px;flex-shrink:0;cursor:default}
+.site-item.snoozed{opacity:.55;border-style:dashed}
+.site-item.snoozed .site-domain{text-decoration:line-through;color:var(--t3)}
+
+/* ─── Snooze menu ─────────────────────────────────────────── */
+.snooze-wrap{position:relative;flex-shrink:0}
+.snooze-btn{background:none;border:1px solid var(--border);border-radius:5px;color:var(--t3);cursor:pointer;font-size:11px;padding:2px 6px;transition:all .12s;line-height:1.4}
+.snooze-btn:hover{color:var(--amber);border-color:var(--amber)}
+.snooze-menu{display:none;position:absolute;right:0;top:calc(100% + 3px);background:var(--s1);border:1px solid var(--border);border-radius:var(--r);z-index:200;min-width:130px;box-shadow:0 4px 16px rgba(0,0,0,.1);overflow:hidden}
+.snooze-menu.open{display:block}
+.snooze-item{padding:7px 12px;font-size:11px;cursor:pointer;color:var(--t2);transition:background .1s;white-space:nowrap}
+.snooze-item:hover{background:var(--s2);color:var(--text)}
+.snooze-item.unsnooze{color:var(--green);border-top:1px solid var(--border)}
+
+/* ─── Import modal ────────────────────────────────────────── */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:18px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.modal-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.modal-sub{font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.6}
+.modal textarea{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:monospace;font-size:11px;padding:9px 10px;outline:none;resize:vertical;min-height:110px;transition:border-color .12s}
+.modal textarea:focus{border-color:var(--red)}
+.modal-actions{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
+.modal-hint{font-size:10px;color:var(--t3);margin-top:8px;line-height:1.6}
+.drop-zone{border:2px dashed var(--border);border-radius:var(--r);padding:14px;text-align:center;font-size:11px;color:var(--t3);cursor:pointer;transition:all .15s;margin-bottom:8px}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--red);color:var(--red);background:var(--red-d)}
+.drop-zone svg{width:20px;height:20px;margin-bottom:4px;display:block;margin-left:auto;margin-right:auto}
+.import-result{font-size:11px;margin-top:8px;padding:7px 10px;border-radius:6px;display:none}
+.import-result.ok{background:var(--green-d);color:var(--green);display:block}
+.import-result.err{background:var(--red-d);color:var(--red);display:block}
 </style>
 </head>
 <body>
@@ -263,7 +295,11 @@ body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
         Danh sách chặn
       </span>
-      <span class="badge badge-red" id="countBadge">0 trang</span>
+      <div style="display:flex;gap:5px;align-items:center">
+        <span class="badge badge-red" id="countBadge">0 trang</span>
+        <button class="btn btn-ghost btn-sm" id="importBtn" title="Import danh sách">⬆ Import</button>
+        <button class="btn btn-ghost btn-sm" id="exportBtn" title="Export danh sách">⬇ Export</button>
+      </div>
     </div>
     <div class="site-list" id="siteList"></div>
     <div class="add-row">
@@ -413,5 +449,27 @@ body{width:380px;background:var(--bg);color:var(--text);font-family:'Inter',sans
 </div>
 
 <script src="popup.js"></script>
+
+<!-- Import modal -->
+<div class="modal-backdrop" id="importModal">
+  <div class="modal">
+    <div class="modal-title">⬆ Import danh sách chặn</div>
+    <div class="modal-sub">Kéo thả file vào đây, hoặc paste trực tiếp. Mỗi domain một dòng.<br/>Hỗ trợ: <strong>.txt</strong> · <strong>.csv</strong> · <strong>.json</strong></div>
+
+    <div class="drop-zone" id="dropZone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Kéo thả file vào đây hoặc <u style="cursor:pointer" id="browseLink">chọn file</u>
+    </div>
+    <input type="file" id="fileInput" accept=".txt,.csv,.json" style="display:none"/>
+
+    <textarea id="importText" placeholder="facebook.com&#10;twitter.com&#10;instagram.com&#10;..."></textarea>
+    <div class="modal-hint">💡 Các dòng trùng lặp hoặc không hợp lệ sẽ tự động bỏ qua.</div>
+    <div class="import-result" id="importResult"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="importCancelBtn">Hủy</button>
+      <button class="btn btn-red" id="importConfirmBtn">Import</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
